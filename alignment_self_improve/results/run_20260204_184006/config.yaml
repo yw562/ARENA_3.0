@@ -43,8 +43,8 @@ loop:
 
 generation:
   task: "gsm8k"
-  num_samples: 100 #ideal: 100
-  max_new_tokens: 1024 # ideal:512
+  num_samples: 20 #ideal: 100
+  max_new_tokens: 256 # ideal:512
   temperature: 0.0
   top_p: 1.0
 
