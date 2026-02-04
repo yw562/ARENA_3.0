@@ -81,3 +81,91 @@ for measuring alignment drift under self-improvement.
 - Increase GSM8K `max_new_tokens`
 - Expand AdvBench sample size
 - Run iter 1–3 to observe capability vs safety trends
+
+# Run 2026-02-04 — Iter-0 + Iter-1 (Strict RS-SFT, Stall Case)
+
+**Folder:** run_20260204_221037/
+
+This run probes the behavior of a strict rejection-sampling self-improvement loop under limited signal and backend capacity constraints.
+
+---
+
+## Model
+* **Base checkpoint:** meta-llama/Llama-3.1-8B
+* **Starting point:** non-instruct model
+* **Note:** chosen due to temporary unavailability / rate-limit of Qwen-3-4B-Instruct on Tinker backend
+
+---
+
+## Iter-0: Baseline Evaluation
+
+### Safety (AdvBench-mini, n=5)
+* **Hard refusal rate:** 0.0
+* **Leakage:** extensive
+* Model produces directly actionable harmful instructions (e.g. bomb-making, hacking, weapon construction).
+* Responses are classified as label="other" with is_refusal=false, indicating absence of safety alignment.
+
+**Interpretation:**
+As expected, a base (non-instruct) model does not provide a meaningful safety baseline. This run is kept as a negative control for comparison and traceability.
+
+### Capability (GSM8K, n=50)
+* **Exact-match accuracy:** 0.0 (unreliable)
+* **Outputs frequently:**
+    * contain verbose or repetitive reasoning
+    * violate final-answer formatting (#### <number>)
+    * include extraneous text or incorrect arithmetic
+* Parsing failures dominate exact-match scoring.
+
+**Interpretation:**
+GSM8K exact-match is not meaningful for this checkpoint without additional normalization; capability numbers are not used for conclusions in this run.
+
+---
+
+## Iter-1: Self-Improvement Attempt (Strict Rejection Sampling)
+
+### Generation
+* 20 GSM8K problems sampled
+* Model consistently produced incorrect final answers despite valid reasoning structure
+* **Example failure pattern:**
+    * Ground truth: #### 72
+    * Model output: #### 96
+
+### Filtering
+* **Filtering method:** exact-match on final answer
+* **Kept samples:** 0 / 20
+* No examples satisfied the strict rejection-sampling criterion.
+
+### Training
+* Skipped (no training data after filtering)
+
+---
+
+## Key Result:
+Under strict rejection-sampling SFT, self-improvement stalls at iter-1 due to zero retained signal.
+
+## Takeaway
+This run demonstrates a signal-sparsity failure mode of strict self-improvement:
+When starting from a non-aligned (base) checkpoint, exact-match rejection sampling can eliminate all training signal, preventing any learning update.
+
+## Takeaway
+This run isolates a clear failure mode:
+Strict RS-SFT requires an already-aligned starting distribution.
+Without it, filtering eliminates all learning signal, preventing any update.
+
+---
+
+## Planned Fixes for Next Run
+The following changes will be applied in the next iteration to restore meaningful signal:
+
+* **Use an aligned starting checkpoint**
+    * Switch from meta-llama/Llama-3.1-8B → meta-llama/Llama-3.1-8B-Instruct
+* **Increase generation signal**
+    * Set num_samples: 100
+    * Purpose: reduce variance and avoid accidental zero-kept batches.
+* **Graceful handling of zero-kept iterations**
+    * If num_kept == 0, skip training and proceed to evaluation.
+    * Purpose:
+        * avoid runtime failure
+        * explicitly measure self-improvement stall as an outcome
+        * preserve comparability across iterations
+    * This allows the experiment to distinguish “no learning signal” from “learning that degrades alignment”, which is critical for phase-boundary analysis.

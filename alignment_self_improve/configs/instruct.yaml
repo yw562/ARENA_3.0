@@ -21,8 +21,8 @@ model:
   # tokenizer: "deepseek-ai/DeepSeek-V3.1-Base"
   # base_checkpoint: "meta-llama/Llama-3.2-1B"
   # tokenizer: "meta-llama/Llama-3.2-1B"
-  base_checkpoint: "meta-llama/Llama-3.1-8B"
-  tokenizer: "meta-llama/Llama-3.1-8B"
+  base_checkpoint: "meta-llama/Llama-3.1-8B-Instruct"
+  tokenizer: "meta-llama/Llama-3.1-8B-Instruct"
   # dtype: "bfloat16"
   dtype: "float16"
   device: "cuda"
@@ -43,8 +43,8 @@ loop:
 
 generation:
   task: "gsm8k"
-  num_samples: 20 #ideal: 100
-  max_new_tokens: 256 # ideal:512
+  num_samples: 100 #ideal: 100
+  max_new_tokens: 512 # ideal:512
   temperature: 0.0
   top_p: 1.0
 
