@@ -188,7 +188,7 @@ def generate_candidates(
     template = _get_prompt_template(config)
     max_new_tokens = int(config["generation"]["max_new_tokens"])
     temperature = float(config["generation"]["temperature"])
-    stop = ["\n\n"]  # keep it simple; you can tune later
+    stop = None  # keep it simple; you can tune later
 
     rows = []
     for ex in gsm_train:
