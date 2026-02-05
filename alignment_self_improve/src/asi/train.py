@@ -160,6 +160,52 @@ def finetune_sft_lora(
     return model_ref
 
 
+# def sample_text(
+#     *,
+#     model_ref: TinkerModelRef,
+#     prompt: str,
+#     max_tokens: int,
+#     temperature: float,
+#     stop: Optional[List[str]] = None,
+#     num_samples: int = 1,
+# ) -> List[str]:
+#     """
+#     Sample using a Tinker sampling client.
+#     """
+#     import tinker  # type: ignore
+#     from tinker import types  # type: ignore
+
+#     service_client = get_service_client()
+
+#     service_client = get_service_client()
+
+
+#     if model_ref.sampling_model_path is None:
+#         # iter-0：base model → use training client to sample
+#         training_client = get_training_client(
+#             base_model=model_ref.base_model,
+#             rank=32,
+#         )
+#         tokenizer = training_client.get_tokenizer()
+#         sampling_client = training_client.save_weights_and_get_sampling_client(
+#             name="iter0_base_sampler"
+#         )
+#     else:
+#         sampling_client = service_client.create_sampling_client(
+#             model_path=model_ref.sampling_model_path
+#         )
+#         tokenizer = get_tokenizer(model_ref.base_model)
+
+
+#     mi = types.ModelInput.from_ints(tokenizer.encode(prompt))
+#     params = types.SamplingParams(
+#         max_tokens=max_tokens,
+#         temperature=temperature,
+#         stop=stop or [],
+#     )
+#     fut = sampling_client.sample(prompt=mi, sampling_params=params, num_samples=num_samples)
+#     res = fut.result()
+#     return [tokenizer.decode(seq.tokens) for seq in res.sequences]
 def sample_text(
     *,
     model_ref: TinkerModelRef,
@@ -169,53 +215,24 @@ def sample_text(
     stop: Optional[List[str]] = None,
     num_samples: int = 1,
 ) -> List[str]:
-    """
-    Sample using a Tinker sampling client.
-    """
-    import tinker  # type: ignore
-    from tinker import types  # type: ignore
-
+    import tinker.types as types  # type: ignore
     service_client = get_service_client()
 
-    # if model_ref.sampling_model_path is None:
-    #     # No finetuned weights saved yet; sample from base model via a temporary training client.
-    #     training_client = get_training_client(base_model=model_ref.base_model, rank=32)
-    #     tokenizer = training_client.get_tokenizer()
-    #     sampling_client = training_client.save_weights_and_get_sampling_client(name="tmp_base_sampler")
-    # else:
-    #     sampling_client = service_client.create_sampling_client(model_path=model_ref.sampling_model_path)
-    #     # Need tokenizer; easiest: create a training client just to get tokenizer.
-    #     training_client = get_training_client(base_model=model_ref.base_model, rank=32)
-    #     tokenizer = training_client.get_tokenizer()
-    service_client = get_service_client()
-
-    # if model_ref.sampling_model_path is None:
-    #     # iter-0: base model sampling（不创建 training client）
-    #     sampling_client = service_client.create_sampling_client(
-    #         model_path=model_ref.base_model
-    #     )
-    #     tokenizer = get_tokenizer(model_ref.base_model)
-    # else:
-    #     sampling_client = service_client.create_sampling_client(
-    #         model_path=model_ref.sampling_model_path
-    #     )
-    #     tokenizer = get_tokenizer(model_ref.base_model)
-    if model_ref.sampling_model_path is None:
-        # iter-0：base model → use training client to sample
-        training_client = get_training_client(
-            base_model=model_ref.base_model,
-            rank=32,
-        )
-        tokenizer = training_client.get_tokenizer()
-        sampling_client = training_client.save_weights_and_get_sampling_client(
-            name="iter0_base_sampler"
-        )
+    # 1. add tinker://
+    if model_ref.sampling_model_path is not None:
+        p = model_ref.sampling_model_path
+        path_to_load = p if p.startswith("tinker://") else f"tinker://{p}"
     else:
-        sampling_client = service_client.create_sampling_client(
-            model_path=model_ref.sampling_model_path
-        )
-        tokenizer = get_tokenizer(model_ref.base_model)
+        # Iter-0: avoid ValueError
+        path_to_load = f"tinker://{model_ref.base_model}"
 
+    # 2. always use create_sampling_client 
+    # in this case it will not "concurrent training clients rate limit"
+    sampling_client = service_client.create_sampling_client(
+        model_path=path_to_load
+    )
+
+    tokenizer = get_tokenizer(model_ref.base_model)
 
     mi = types.ModelInput.from_ints(tokenizer.encode(prompt))
     params = types.SamplingParams(
@@ -223,16 +240,20 @@ def sample_text(
         temperature=temperature,
         stop=stop or [],
     )
-    fut = sampling_client.sample(prompt=mi, sampling_params=params, num_samples=num_samples)
+
+    fut = sampling_client.sample(
+        prompt=mi,
+        sampling_params=params,
+        num_samples=num_samples,
+    )
     res = fut.result()
     return [tokenizer.decode(seq.tokens) for seq in res.sequences]
 
 def get_tokenizer(base_model: str):
     if base_model not in _TOKENIZER_CACHE:
         service_client = get_service_client()
-        sampling_client = service_client.create_sampling_client(
-            model_path=base_model
-        )
+        # must use create_sampling_client，do not use get_training_client
+        path = base_model if base_model.startswith("tinker://") else f"tinker://{base_model}"
+        sampling_client = service_client.create_sampling_client(model_path=path)
         _TOKENIZER_CACHE[base_model] = sampling_client.get_tokenizer()
     return _TOKENIZER_CACHE[base_model]
-
