@@ -26,6 +26,69 @@ class IterationResult:
     num_kept: int
 
 
+# def run_self_improvement_iteration(
+#     *,
+#     iteration: int,
+#     model_dir: Path,
+#     config: Dict,
+#     work_dir: Path,
+# ) -> IterationResult:
+#     """
+#     generate → filter → train → return artifacts
+#     """
+#     iter_dir = work_dir / f"iter_{iteration}"
+#     iter_dir.mkdir(parents=True, exist_ok=True)
+
+#     generated_path = iter_dir / "generated.jsonl"
+#     filtered_path = iter_dir / "filtered.jsonl"
+#     new_model_dir = iter_dir / "model"
+
+#     # num_generated = generate_candidates(
+#     #     model_dir=model_dir,
+#     #     config=config,
+#     #     output_path=generated_path,
+#     # )
+
+#     num_kept = filter_candidates(
+#         generated_path=generated_path,
+#         config=config,
+#         output_path=filtered_path,
+#     )
+
+
+#     # IMPORTANT: skip training if no data survives filtering
+#     if num_kept == 0:
+#         print(f"[iter {iteration}] No training data kept; skipping finetune.")
+#         return IterationResult(
+#             iteration=iteration,
+#             model_dir=model_dir,  # reuse previous model
+#             generated_data_path=generated_path,
+#             filtered_data_path=filtered_path,
+#             num_generated=num_generated,
+#             num_kept=0,
+#         )
+
+
+#     # =====================================================
+#     # Normal training path
+#     # =====================================================
+#     train_on_filtered_data(
+#         base_model_dir=model_dir,
+#         training_data_path=filtered_path,
+#         config=config,
+#         output_model_dir=new_model_dir,
+#         iteration=iteration,
+#     )
+
+#     return IterationResult(
+#         iteration=iteration,
+#         model_dir=new_model_dir,
+#         generated_data_path=generated_path,
+#         filtered_data_path=filtered_path,
+#         num_generated=num_generated,
+#         num_kept=num_kept,
+#     )
+
 def run_self_improvement_iteration(
     *,
     iteration: int,
@@ -33,9 +96,6 @@ def run_self_improvement_iteration(
     config: Dict,
     work_dir: Path,
 ) -> IterationResult:
-    """
-    generate → filter → train → return artifacts
-    """
     iter_dir = work_dir / f"iter_{iteration}"
     iter_dir.mkdir(parents=True, exist_ok=True)
 
@@ -43,63 +103,54 @@ def run_self_improvement_iteration(
     filtered_path = iter_dir / "filtered.jsonl"
     new_model_dir = iter_dir / "model"
 
-    # num_generated = generate_candidates(
-    #     model_dir=model_dir,
-    #     config=config,
-    #     output_path=generated_path,
-    # )
+    # --- new add：generation ---
+    if generated_path.exists():
+        print(f"[iter {iteration}] Found existing generated data.")
+        with generated_path.open("r") as f:
+            num_generated = sum(1 for _ in f)
+    else:
+        print(f"[iter {iteration}] No generated data found. Generating...")
+        num_generated = generate_candidates(
+            model_dir=model_dir,
+            config=config,
+            output_path=generated_path,
+        )
 
-    num_kept = filter_candidates(
-        generated_path=generated_path,
-        config=config,
-        output_path=filtered_path,
-    )
+    # --- new add：filtering ---
+    if filtered_path.exists():
+        print(f"[iter {iteration}] Found existing filtered data.")
+        with filtered_path.open("r") as f:
+            num_kept = sum(1 for _ in f)
+    else:
+        num_kept = filter_candidates(
+            generated_path=generated_path,
+            config=config,
+            output_path=filtered_path,
+        )
 
-
-    # IMPORTANT: skip training if no data survives filtering
+    # --- previous logics ---
     if num_kept == 0:
         print(f"[iter {iteration}] No training data kept; skipping finetune.")
         return IterationResult(
             iteration=iteration,
-            model_dir=model_dir,  # reuse previous model
+            model_dir=model_dir,
             generated_data_path=generated_path,
             filtered_data_path=filtered_path,
             num_generated=num_generated,
             num_kept=0,
         )
 
-    train_on_filtered_data(
-        base_model_dir=model_dir,
-        training_data_path=filtered_path,
-        config=config,
-        output_model_dir=new_model_dir,
-        iteration=iteration,
-    )
-
-    # =====================================================
-    # EARLY EXIT: strict RS-SFT stalls (no data kept)(new add)
-    # =====================================================
-    if num_kept == 0:
-        print(f"[iter {iteration}] No training data kept; skipping finetune.")
-
-        return IterationResult(
+    # --- train, safety optional ---
+    if (new_model_dir / "tinker_model_ref.json").exists():
+        print(f"[iter {iteration}] Model already trained. Skipping training.")
+    else:
+        train_on_filtered_data(
+            base_model_dir=model_dir,
+            training_data_path=filtered_path,
+            config=config,
+            output_model_dir=new_model_dir,
             iteration=iteration,
-            model_dir=model_dir,  # return previous model
-            generated_data_path=generated_path,
-            filtered_data_path=filtered_path,
-            num_generated=num_generated,
-            num_kept=0,
         )
-    # =====================================================
-    # Normal training path
-    # =====================================================
-    train_on_filtered_data(
-        base_model_dir=model_dir,
-        training_data_path=filtered_path,
-        config=config,
-        output_model_dir=new_model_dir,
-        iteration=iteration,
-    )
 
     return IterationResult(
         iteration=iteration,

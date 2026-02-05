@@ -189,17 +189,33 @@ def sample_text(
     #     tokenizer = training_client.get_tokenizer()
     service_client = get_service_client()
 
+    # if model_ref.sampling_model_path is None:
+    #     # iter-0: base model sampling（不创建 training client）
+    #     sampling_client = service_client.create_sampling_client(
+    #         model_path=model_ref.base_model
+    #     )
+    #     tokenizer = get_tokenizer(model_ref.base_model)
+    # else:
+    #     sampling_client = service_client.create_sampling_client(
+    #         model_path=model_ref.sampling_model_path
+    #     )
+    #     tokenizer = get_tokenizer(model_ref.base_model)
     if model_ref.sampling_model_path is None:
-        # iter-0: base model sampling（不创建 training client）
-        sampling_client = service_client.create_sampling_client(
-            model_path=model_ref.base_model
+        # iter-0：base model → use training client to sample
+        training_client = get_training_client(
+            base_model=model_ref.base_model,
+            rank=32,
         )
-        tokenizer = get_tokenizer(model_ref.base_model)
+        tokenizer = training_client.get_tokenizer()
+        sampling_client = training_client.save_weights_and_get_sampling_client(
+            name="iter0_base_sampler"
+        )
     else:
         sampling_client = service_client.create_sampling_client(
             model_path=model_ref.sampling_model_path
         )
         tokenizer = get_tokenizer(model_ref.base_model)
+
 
     mi = types.ModelInput.from_ints(tokenizer.encode(prompt))
     params = types.SamplingParams(
@@ -213,6 +229,10 @@ def sample_text(
 
 def get_tokenizer(base_model: str):
     if base_model not in _TOKENIZER_CACHE:
-        training_client = get_training_client(base_model=base_model, rank=32)
-        _TOKENIZER_CACHE[base_model] = training_client.get_tokenizer()
+        service_client = get_service_client()
+        sampling_client = service_client.create_sampling_client(
+            model_path=base_model
+        )
+        _TOKENIZER_CACHE[base_model] = sampling_client.get_tokenizer()
     return _TOKENIZER_CACHE[base_model]
+
