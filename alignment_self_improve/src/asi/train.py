@@ -12,6 +12,7 @@ from .tracking import ensure_dir, write_json
 
 MODEL_REF_FILENAME = "tinker_model_ref.json"
 
+_TOKENIZER_CACHE: Dict[str, object] = {}
 
 @dataclass
 class TinkerModelRef:
@@ -45,9 +46,18 @@ def create_initial_model_ref(model_dir: Path, base_model: str) -> None:
     save_model_ref(model_dir, TinkerModelRef(base_model=base_model, sampling_model_path=None))
 
 
+# def get_service_client():
+#     import tinker  # type: ignore
+#     return tinker.ServiceClient()
+
+_SERVICE_CLIENT = None
+
 def get_service_client():
-    import tinker  # type: ignore
-    return tinker.ServiceClient()
+    global _SERVICE_CLIENT
+    if _SERVICE_CLIENT is None:
+        import tinker  # type: ignore
+        _SERVICE_CLIENT = tinker.ServiceClient()
+    return _SERVICE_CLIENT
 
 
 def get_training_client(base_model: str, rank: int = 32):
@@ -167,16 +177,29 @@ def sample_text(
 
     service_client = get_service_client()
 
+    # if model_ref.sampling_model_path is None:
+    #     # No finetuned weights saved yet; sample from base model via a temporary training client.
+    #     training_client = get_training_client(base_model=model_ref.base_model, rank=32)
+    #     tokenizer = training_client.get_tokenizer()
+    #     sampling_client = training_client.save_weights_and_get_sampling_client(name="tmp_base_sampler")
+    # else:
+    #     sampling_client = service_client.create_sampling_client(model_path=model_ref.sampling_model_path)
+    #     # Need tokenizer; easiest: create a training client just to get tokenizer.
+    #     training_client = get_training_client(base_model=model_ref.base_model, rank=32)
+    #     tokenizer = training_client.get_tokenizer()
+    service_client = get_service_client()
+
     if model_ref.sampling_model_path is None:
-        # No finetuned weights saved yet; sample from base model via a temporary training client.
-        training_client = get_training_client(base_model=model_ref.base_model, rank=32)
-        tokenizer = training_client.get_tokenizer()
-        sampling_client = training_client.save_weights_and_get_sampling_client(name="tmp_base_sampler")
+        # iter-0: base model sampling（不创建 training client）
+        sampling_client = service_client.create_sampling_client(
+            model_path=model_ref.base_model
+        )
+        tokenizer = get_tokenizer(model_ref.base_model)
     else:
-        sampling_client = service_client.create_sampling_client(model_path=model_ref.sampling_model_path)
-        # Need tokenizer; easiest: create a training client just to get tokenizer.
-        training_client = get_training_client(base_model=model_ref.base_model, rank=32)
-        tokenizer = training_client.get_tokenizer()
+        sampling_client = service_client.create_sampling_client(
+            model_path=model_ref.sampling_model_path
+        )
+        tokenizer = get_tokenizer(model_ref.base_model)
 
     mi = types.ModelInput.from_ints(tokenizer.encode(prompt))
     params = types.SamplingParams(
@@ -187,3 +210,9 @@ def sample_text(
     fut = sampling_client.sample(prompt=mi, sampling_params=params, num_samples=num_samples)
     res = fut.result()
     return [tokenizer.decode(seq.tokens) for seq in res.sequences]
+
+def get_tokenizer(base_model: str):
+    if base_model not in _TOKENIZER_CACHE:
+        training_client = get_training_client(base_model=base_model, rank=32)
+        _TOKENIZER_CACHE[base_model] = training_client.get_tokenizer()
+    return _TOKENIZER_CACHE[base_model]

@@ -43,17 +43,39 @@ def run_self_improvement_iteration(
     filtered_path = iter_dir / "filtered.jsonl"
     new_model_dir = iter_dir / "model"
 
-    num_generated = generate_candidates(
-        model_dir=model_dir,
-        config=config,
-        output_path=generated_path,
-    )
+    # num_generated = generate_candidates(
+    #     model_dir=model_dir,
+    #     config=config,
+    #     output_path=generated_path,
+    # )
 
     num_kept = filter_candidates(
         generated_path=generated_path,
         config=config,
         output_path=filtered_path,
     )
+
+
+    # IMPORTANT: skip training if no data survives filtering
+    if num_kept == 0:
+        print(f"[iter {iteration}] No training data kept; skipping finetune.")
+        return IterationResult(
+            iteration=iteration,
+            model_dir=model_dir,  # reuse previous model
+            generated_data_path=generated_path,
+            filtered_data_path=filtered_path,
+            num_generated=num_generated,
+            num_kept=0,
+        )
+
+    train_on_filtered_data(
+        base_model_dir=model_dir,
+        training_data_path=filtered_path,
+        config=config,
+        output_model_dir=new_model_dir,
+        iteration=iteration,
+    )
+
     # =====================================================
     # EARLY EXIT: strict RS-SFT stalls (no data kept)(new add)
     # =====================================================
