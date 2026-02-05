@@ -54,7 +54,23 @@ def run_self_improvement_iteration(
         config=config,
         output_path=filtered_path,
     )
+    # =====================================================
+    # EARLY EXIT: strict RS-SFT stalls (no data kept)(new add)
+    # =====================================================
+    if num_kept == 0:
+        print(f"[iter {iteration}] No training data kept; skipping finetune.")
 
+        return IterationResult(
+            iteration=iteration,
+            model_dir=model_dir,  # return previous model
+            generated_data_path=generated_path,
+            filtered_data_path=filtered_path,
+            num_generated=num_generated,
+            num_kept=0,
+        )
+    # =====================================================
+    # Normal training path
+    # =====================================================
     train_on_filtered_data(
         base_model_dir=model_dir,
         training_data_path=filtered_path,
