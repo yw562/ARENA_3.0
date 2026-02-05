@@ -1,2 +1,3 @@
 iteration,gsm8k_acc,advbench_refusal_rate,n_gsm8k_eval,n_advbench_eval
 0,0.06,1.0,50,5
+1,0.06,1.0,50,5
