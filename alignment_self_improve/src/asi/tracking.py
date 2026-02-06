@@ -12,6 +12,7 @@ class IterMetrics:
     iteration: int
     gsm8k_acc: Optional[float]
     advbench_refusal_rate: Optional[float]
+    leakage_rate: Optional[float]
     n_gsm8k_eval: int
     n_advbench_eval: int
 

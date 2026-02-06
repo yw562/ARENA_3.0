@@ -51,7 +51,6 @@ def create_initial_model_ref(model_dir: Path, base_model: str) -> None:
     save_model_ref(model_dir, TinkerModelRef(base_model=base_model, sampling_model_path=None))
 
 
-
 def finetune_sft_lora(
     *,
     base_model: str,
@@ -62,24 +61,112 @@ def finetune_sft_lora(
     batch_size: int,
     lora_rank: int = 32,
     save_name: str = "asi_model",
+    mode: str = "train",   # NEW
 ) -> TinkerModelRef:
     """
-    No-op fine-tuning for Fireworks fallback.
-    We intentionally keep the model frozen to obtain
-    a stable self-improvement signal under fixed policy.
+    Fireworks LoRA fine-tuning with explicit frozen/train switch.
     """
-    assert max_steps == 0 or learning_rate == 0.0, "finetune_sft_lora called in non-frozen mode"
 
     ensure_dir(output_model_dir)
 
-    # IMPORTANT: do NOT change the model
-    model_ref = TinkerModelRef(
-        base_model=base_model,
-        sampling_model_path=base_model,  # reuse base model for next iter
+    # ==========================================================
+    # Phase 1: frozen-policy (no parameter updates)
+    # ==========================================================
+    if mode == "frozen":
+        model_ref = TinkerModelRef(
+            base_model=base_model,
+            sampling_model_path=base_model,
+        )
+        save_model_ref(output_model_dir, model_ref)
+        return model_ref
+
+    # ==========================================================
+    # Phase 2: real LoRA fine-tuning
+    # ==========================================================
+    assert max_steps > 0 and learning_rate > 0.0, \
+        "training.mode=train but max_steps / learning_rate invalid"
+
+    # write training data
+    train_file = output_model_dir / "train.jsonl"
+    with train_file.open("w", encoding="utf-8") as f:
+        for prompt, completion in train_pairs:
+            f.write(json.dumps({
+                "messages": [
+                    {"role": "user", "content": prompt},
+                    {"role": "assistant", "content": completion},
+                ]
+            }) + "\n")
+
+    client = _get_fw_client()
+
+    # 1.upload training file
+    with open(train_file, "rb") as f:
+        upload = client.files.create(
+            file=f,
+            purpose="fine-tune",
+        )
+
+    # 2.launch finetune job
+    job = client.fine_tuning.jobs.create(
+        model=base_model,
+        training_file=upload.id,   # use file_id
+        hyperparameters={
+            "learning_rate": learning_rate,
+            "batch_size": batch_size,
+            "max_steps": max_steps,
+            "lora_rank": lora_rank,
+        },
+        suffix=save_name,
     )
 
+
+    import time
+    while True:
+        job = client.fine_tuning.jobs.retrieve(job.id)
+        if job.status == "succeeded":
+            break
+        if job.status == "failed":
+            raise RuntimeError(f"Fireworks finetune failed: {job}")
+        time.sleep(30)
+        
+    assert job.fine_tuned_model is not None, \
+        "Fine-tune succeeded but no fine_tuned_model returned"
+
+    model_ref = TinkerModelRef(
+        base_model=base_model,
+        sampling_model_path=job.fine_tuned_model,
+    )
     save_model_ref(output_model_dir, model_ref)
     return model_ref
+
+# def finetune_sft_lora(
+#     *,
+#     base_model: str,
+#     train_pairs: List[Tuple[str, str]],
+#     output_model_dir: Path,
+#     learning_rate: float,
+#     max_steps: int,
+#     batch_size: int,
+#     lora_rank: int = 32,
+#     save_name: str = "asi_model",
+# ) -> TinkerModelRef:
+#     """
+#     No-op fine-tuning for Fireworks fallback.
+#     We intentionally keep the model frozen to obtain
+#     a stable self-improvement signal under fixed policy.
+#     """
+#     # assert max_steps == 0 or learning_rate == 0.0, "finetune_sft_lora called in non-frozen mode"
+
+#     ensure_dir(output_model_dir)
+
+#     # IMPORTANT: do NOT change the model
+#     model_ref = TinkerModelRef(
+#         base_model=base_model,
+#         sampling_model_path=base_model,  # reuse base model for next iter
+#     )
+
+#     save_model_ref(output_model_dir, model_ref)
+#     return model_ref
 
 
 # --- add near imports ---
@@ -94,10 +181,11 @@ def _get_fw_client() -> OpenAI:
     global _FW_CLIENT
     if _FW_CLIENT is None:
         _FW_CLIENT = OpenAI(
-            base_url="https://api.fireworks.ai/inference/v1",
+            base_url="https://api.fireworks.ai/v1",  
             api_key=os.environ["FIREWORKS_API_KEY"],
         )
     return _FW_CLIENT
+
 
 
 def _fw_chat(

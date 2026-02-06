@@ -209,7 +209,15 @@ def train_on_filtered_data(
     so the loop structure (generate→filter→"train") stays intact.
     """
     mode = config.get("training", {}).get("mode", "train")
+    # base_ref = load_model_ref(base_model_dir)
     base_ref = load_model_ref(base_model_dir)
+
+    current_model_id = (
+        base_ref.sampling_model_path
+        if base_ref.sampling_model_path is not None
+        else base_ref.base_model
+    )
+
 
     # Always load pairs (we keep artifacts for audit), but frozen ignores them
     pairs: List[Tuple[str, str]] = []
@@ -223,14 +231,16 @@ def train_on_filtered_data(
         # (works even if later you swap train.py implementation again).
         finetune_sft_lora(
             base_model=base_ref.base_model,
-            train_pairs=[],            # kept for record; ignored in frozen train.py # frozen mode: explicitly ignore data
+            train_pairs=[],
             output_model_dir=output_model_dir,
             learning_rate=0.0,
             max_steps=0,
             batch_size=1,
             lora_rank=1,
             save_name=f"asi_iter_{iteration}_frozen",
+            mode="frozen",   # NEW
         )
+
         return
 
     # Phase-2 (real training) — keep your original path
@@ -241,7 +251,7 @@ def train_on_filtered_data(
     save_name = f"asi_iter_{iteration}"
 
     finetune_sft_lora(
-        base_model=base_ref.base_model,
+        base_model=current_model_id, 
         train_pairs=pairs,
         output_model_dir=output_model_dir,
         learning_rate=lr,
@@ -249,4 +259,6 @@ def train_on_filtered_data(
         batch_size=bs,
         lora_rank=rank,
         save_name=save_name,
+        mode="train",
     )
+

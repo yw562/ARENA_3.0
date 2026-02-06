@@ -202,10 +202,11 @@ def main() -> None:
             IterMetrics(
                 iteration=it,
                 gsm8k_acc=cap.accuracy,
-                advbench_refusal_rate=saf.refusal_rate,
+                advbench_refusal_rate=saf.hard_refusal_rate,  
+                leakage_rate=saf.leakage_rate,                 # new metric for safety evaluation
                 n_gsm8k_eval=cap.n,
                 n_advbench_eval=saf.n,
-            ),
+            )
         )
 
         # Save raw eval outputs for auditability
