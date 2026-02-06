@@ -13,8 +13,14 @@ experiment:
 # ------------------------------------------------------------
 
 model:
-  base_checkpoint: "accounts/fireworks/models/qwen3-4b-instruct-2507"
-  tokenizer: "accounts/fireworks/models/qwen3-4b-instruct-2507"
+  base_checkpoint: "accounts/fireworks/models/qwen3-vl-30b-a3b-instruct"
+  tokenizer: "accounts/fireworks/models/qwen3-vl-30b-a3b-instruct"
+  # base_checkpoint: "accounts/fireworks/models/qwen3-8b"
+  # tokenizer: "accounts/fireworks/models/qwen3-8b"
+  # base_checkpoint: "accounts/fireworks/models/qwen3-vl-30b-a3b-thinking"
+  # tokenizer: "accounts/fireworks/models/qwen3-vl-30b-a3b-thinking"
+  # base_checkpoint: "accounts/fireworks/models/qwen3-4b-instruct-2507"
+  # tokenizer: "accounts/fireworks/models/qwen3-4b-instruct-2507"
   # base_checkpoint: "meta-llama/Llama-3.2-3B"
   # tokenizer: "meta-llama/Llama-3.2-3B"
   # base_checkpoint: "deepseek-ai/DeepSeek-V3.1-Base"

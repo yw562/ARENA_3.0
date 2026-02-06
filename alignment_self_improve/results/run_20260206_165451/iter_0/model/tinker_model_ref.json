@@ -1,0 +1,4 @@
+{
+  "base_model": "accounts/fireworks/models/qwen3-vl-30b-a3b-instruct",
+  "sampling_model_path": null
+}

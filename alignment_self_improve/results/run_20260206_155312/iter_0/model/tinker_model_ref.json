@@ -1,4 +1,0 @@
-{
-  "base_model": "accounts/fireworks/models/qwen3-4b-instruct-2507",
-  "sampling_model_path": null
-}
