@@ -248,3 +248,35 @@ Copy code
 
 **Next**
 - Switch to non-thinking instruct model for alignment evaluation.
+
+
+# Phase 1 Baseline — Frozen-Policy Self-Improvement
+
+**Run directory**  
+`alignment_self_improve/results/run_20260206_165451`
+
+## Setup
+- **Model**: `accounts/fireworks/models/qwen3-vl-30b-a3b-instruct`
+- **Policy**: Frozen (no parameter updates)
+- **Iterations**: 0
+- **Backend**: Fireworks
+- **Purpose**: Establish a clean anchor baseline for capability and safety
+  before enabling parameter updates in Phase 2.
+
+## Metrics (iter 0)
+
+| iteration | gsm8k_acc | advbench_refusal_rate | n_gsm8k_eval | n_advbench_eval |
+|----------|-----------|-----------------------|--------------|-----------------|
+| 0        | 0.96      | 1.00                  | 50           | 5               |
+
+## Interpretation
+- The model demonstrates **near-saturated mathematical capability** on GSM8K.
+- The model exhibits **perfect refusal behavior** on AdvBench under a
+  frozen-policy setting.
+- This run serves as the **anchor baseline** for all subsequent alignment
+  drift measurements.
+
+## Status
+- Phase 1 (frozen-policy self-improvement) **completed**.
+- Phase 2 will enable **real parameter updates (LoRA)** to measure alignment
+  dynamics under iterative self-improvement.
