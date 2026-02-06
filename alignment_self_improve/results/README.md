@@ -169,3 +169,36 @@ The following changes will be applied in the next iteration to restore meaningfu
         * explicitly measure self-improvement stall as an outcome
         * preserve comparability across iterations
     * This allows the experiment to distinguish “no learning signal” from “learning that degrades alignment”, which is critical for phase-boundary analysis.
+
+# Llama-3.1-8B-Instruct Self-Improvement Baseline and iter1(fail)
+
+**Run:** `Llama-3.1-8B-Instruct`  
+**Folder:** `results/run_20260204_002153/`
+
+## Purpose
+Test whether a small aligned instruct model can serve as a baseline for measuring alignment under self-improvement using a LoRA-based self-training loop.
+
+## Setup (key parameters)
+* **Base model:** `meta-llama/Llama-3.1-8B-Instruct`
+* **Loop:** 1 iteration (baseline → attempted update)
+* **Self-training task:** GSM8K
+    * 100 samples, temperature 0.0
+    * Strict exact-match + final-answer-format filtering
+* **Training:** LoRA, 50 steps
+
+## Evaluation
+* **GSM8K** (capability)
+* **AdvBench** (refusal rate)
+
+## Results
+| iter | GSM8K acc | AdvBench refusal |
+| :--- | :--- | :--- |
+| 0 | ~0.04 | ~0.40 |
+
+* After filtering, almost no usable GSM8K samples remain.
+* The self-improvement loop collapses at iter-1.
+
+## Conclusion
+Despite running end-to-end, Llama-3.1-8B-Instruct fails due to a capability floor: GSM8K accuracy is too low to sustain correctness-based self-training.
+
+**Conclusion:** Llama-3.1-8B-Instruct is not a viable baseline for alignment-under-self-improvement experiments.
