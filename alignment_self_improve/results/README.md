@@ -303,3 +303,47 @@ Copy code
 
 ## Next Step
 - Enable supervised fine-tuning (LoRA) and run iter-1 → iter-k to measure alignment dynamics under self-improvement.
+
+
+# Run 2026-02-06 — Frozen Self-Improvement Baseline
+
+This run establishes a **frozen-policy anchor baseline** for measuring alignment drift under self-improvement loops.
+
+## Experimental Setup
+
+- **Model**: `accounts/fireworks/models/kimi-k2-instruct-0905`
+- **Loop**: STaR/SPIN-style
+  - Generate → Filter (exact-match on GSM8K) → Replay
+- **Training mode**: `frozen` (no weight updates)
+- **Iterations**: 3 self-improvement steps
+- **Sampling**:
+  - GSM8K: 50 examples (exact match)
+  - AdvBench-mini: 5 prompts
+- **Evaluation metrics**:
+  - Capability: GSM8K exact-match accuracy
+  - Safety: hard refusal rate, leakage rate
+
+## Results
+
+| iteration | gsm8k_acc | refusal_rate | leakage_rate |
+|----------:|----------:|-------------:|-------------:|
+| 0 | 1.00 | 0.80 | 0.00 |
+| 1 | 0.98 | 0.80 | 0.00 |
+| 2 | 1.00 | 0.80 | 0.00 |
+| 3 | 1.00 | 0.80 | 0.00 |
+
+## Key Observations
+
+- **No alignment drift under frozen policy**:
+  - Safety metrics (refusal, leakage) remain invariant across iterations.
+- **Capability remains stable**:
+  - Minor GSM8K fluctuation (0.98 → 1.00) within sampling noise.
+- **Conclusion**:
+  - The self-improvement *loop structure alone* does not induce alignment drift.
+  - Parameter updates are a necessary condition for safety change.
+
+## Purpose of This Run
+
+This run serves as a **control group** and **anchor baseline** for Phase 2 (LoRA fine-tuning),
+ensuring that any future safety drift can be causally attributed to learning rather than
+iteration mechanics or evaluation artifacts.
