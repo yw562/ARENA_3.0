@@ -215,24 +215,25 @@ def sample_text(
     stop: Optional[List[str]] = None,
     num_samples: int = 1,
 ) -> List[str]:
-    import tinker.types as types  # type: ignore
+    """
+    Sampling:
+    - Iter-0 (no sampling_model_path yet): use a training client to obtain a valid sampling client + tokenizer.
+    - Iter-1+ (sampling_model_path exists): use ServiceClient sampling client (no training client).
+    """
+    from tinker import types  # type: ignore
+
     service_client = get_service_client()
 
-    # 1. add tinker://
-    if model_ref.sampling_model_path is not None:
-        p = model_ref.sampling_model_path
-        path_to_load = p if p.startswith("tinker://") else f"tinker://{p}"
+    if model_ref.sampling_model_path is None:
+        # Iter-0: base model name is NOT a valid service sampling path.
+        # Use training client to get a sampling client (this returns a valid tinker model_path).
+        training_client = get_training_client(base_model=model_ref.base_model, rank=32)
+        tokenizer = training_client.get_tokenizer()
+        sampling_client = training_client.save_weights_and_get_sampling_client(name="iter0_base_sampler")
     else:
-        # Iter-0: avoid ValueError
-        path_to_load = f"tinker://{model_ref.base_model}"
-
-    # 2. always use create_sampling_client 
-    # in this case it will not "concurrent training clients rate limit"
-    sampling_client = service_client.create_sampling_client(
-        model_path=path_to_load
-    )
-
-    tokenizer = get_tokenizer(model_ref.base_model)
+        # Iter-1+: sampling_model_path should be a valid tinker path
+        sampling_client = service_client.create_sampling_client(model_path=model_ref.sampling_model_path)
+        tokenizer = get_tokenizer(model_ref.base_model)
 
     mi = types.ModelInput.from_ints(tokenizer.encode(prompt))
     params = types.SamplingParams(
@@ -240,20 +241,20 @@ def sample_text(
         temperature=temperature,
         stop=stop or [],
     )
-
-    fut = sampling_client.sample(
-        prompt=mi,
-        sampling_params=params,
-        num_samples=num_samples,
-    )
+    fut = sampling_client.sample(prompt=mi, sampling_params=params, num_samples=num_samples)
     res = fut.result()
     return [tokenizer.decode(seq.tokens) for seq in res.sequences]
 
 def get_tokenizer(base_model: str):
+    """
+    Get tokenizer in a safe way.
+    We deliberately use a training client ONLY to fetch the tokenizer,
+    because create_sampling_client requires a valid tinker model_path.
+    """
     if base_model not in _TOKENIZER_CACHE:
-        service_client = get_service_client()
-        # must use create_sampling_client，do not use get_training_client
-        path = base_model if base_model.startswith("tinker://") else f"tinker://{base_model}"
-        sampling_client = service_client.create_sampling_client(model_path=path)
-        _TOKENIZER_CACHE[base_model] = sampling_client.get_tokenizer()
+        training_client = get_training_client(
+            base_model=base_model,
+            rank=1,  # minimal rank, tokenizer-only usage
+        )
+        _TOKENIZER_CACHE[base_model] = training_client.get_tokenizer()
     return _TOKENIZER_CACHE[base_model]
