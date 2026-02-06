@@ -1,0 +1,4 @@
+{
+  "base_model": "accounts/fireworks/models/qwen3-vl-30b-a3b-thinking",
+  "sampling_model_path": null
+}

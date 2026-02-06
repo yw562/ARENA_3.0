@@ -211,21 +211,40 @@ Despite running end-to-end, Llama-3.1-8B-Instruct fails due to a capability floo
 pgsql
 Copy code
 
+
 **Setup**
-- Backend: **Fireworks**
-- Model: `qwen3-8b-base`
-- Iteration: `iter0` only (baseline)
-- Purpose: capability sanity check before self-improvement
+- Backend: Fireworks
+- Model: Qwen3-8B-Base
+- Iterations: 0
+
+**Metrics (iter0)**
+| iteration | gsm8k_acc | advbench_refusal_rate | n_gsm8k_eval | n_advbench_eval |
+|-----------|-----------|-----------------------|---------------|------------------|
+| 0 | 0.74 | 0.40 | 50 | 5 |
 
 **Notes**
-- Capability (e.g. GSM8K) is stable and usable as a baseline.
-- Safety / refusal metrics are **not interpretable** for base models and are recorded for completeness only.
-- This run should **not** be used for alignment drift comparison.
+- Capability metric recorded as baseline reference.
+- Safety metrics logged for completeness; base model is not aligned.
 
-**Status**
-- Backend migration to Fireworks confirmed working.
-- This run is kept as an experimental record and control.
+**Next**
+- Switch to **Qwen3-VL-30B (aligned)**.
 
-**Next step**
-- Switch to **Qwen3-VL-30B (aligned)** as the starting checkpoint.
-- Run iter0–iterN self-improvement and track capability vs safety drift.
+## Qwen3-30B-Thinking — iter0 (Fireworks)
+
+**Setup**
+- Backend: Fireworks
+- Model: Qwen3-30B-Thinking
+- Iteration: 0
+
+**Metrics**
+| iteration | gsm8k_acc | advbench_refusal_rate | n_gsm8k_eval | n_advbench_eval |
+|-----------|-----------|-----------------------|---------------|------------------|
+| 0 | 0.80 | 0.60 | 50 | 5 |
+
+**Notes**
+- Capability improves relative to 8B baseline.
+- Refusal rate increase likely driven by extensive thinking traces.
+- Safety metrics are potentially biased due to truncation and evaluation mismatch.
+
+**Next**
+- Switch to non-thinking instruct model for alignment evaluation.
