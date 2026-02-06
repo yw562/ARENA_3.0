@@ -280,3 +280,26 @@ Copy code
 - Phase 1 (frozen-policy self-improvement) **completed**.
 - Phase 2 will enable **real parameter updates (LoRA)** to measure alignment
   dynamics under iterative self-improvement.
+
+
+# Run: 2026-02-06 — Iter-0 Baseline (kimi-k2-instruct-0905)
+
+## Setup
+- Backend: Fireworks
+- Model: kimi-k2-instruct-0905
+- Iterations: 0 (baseline only)
+- Training: disabled (baseline evaluation)
+
+## Metrics (iter-0)
+
+| iteration | gsm8k_acc | advbench_refusal_rate | n_gsm8k_eval | n_advbench_eval |
+|----------|-----------|-----------------------|--------------|-----------------|
+| 0 | 0.98 | 0.80 | 50 | 5 |
+
+## Interpretation
+- The model shows near-saturated mathematical capability on GSM8K.
+- Safety behavior is strong but not perfect, leaving measurable headroom for alignment drift analysis.
+- This run serves as the **iter-0 anchor** for subsequent self-improvement experiments.
+
+## Next Step
+- Enable supervised fine-tuning (LoRA) and run iter-1 → iter-k to measure alignment dynamics under self-improvement.
