@@ -1,3 +1,160 @@
+
+
+
+#train.py for fireworks
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import os
+import requests
+
+import numpy as np
+
+from .tracking import ensure_dir, write_json
+
+
+MODEL_REF_FILENAME = "tinker_model_ref.json"
+
+_TOKENIZER_CACHE: Dict[str, object] = {}
+
+@dataclass
+class TinkerModelRef: # just name... too lazy to revise it:)
+
+    base_model: str
+    # after saving weights, Tinker returns a sampling client with a model_path/name;
+    # we store the identifier we can reuse.
+    sampling_model_path: Optional[str] = None
+
+
+def save_model_ref(model_dir: Path, ref: TinkerModelRef) -> None:
+    ensure_dir(model_dir)
+    write_json(model_dir / MODEL_REF_FILENAME, ref.__dict__)
+
+
+def load_model_ref(model_dir: Path) -> TinkerModelRef:
+    p = model_dir / MODEL_REF_FILENAME
+    if not p.exists():
+        raise FileNotFoundError(f"Missing {MODEL_REF_FILENAME} in {model_dir}")
+    d = json.loads(p.read_text())
+    return TinkerModelRef(**d)
+
+
+def create_initial_model_ref(model_dir: Path, base_model: str) -> None:
+    """
+    For iteration 0, we only have base_model; sampling_model_path will be created after first finetune.
+    """
+    save_model_ref(model_dir, TinkerModelRef(base_model=base_model, sampling_model_path=None))
+
+
+
+def finetune_sft_lora(
+    *,
+    base_model: str,
+    train_pairs: List[Tuple[str, str]],
+    output_model_dir: Path,
+    learning_rate: float,
+    max_steps: int,
+    batch_size: int,
+    lora_rank: int = 32,
+    save_name: str = "asi_model",
+) -> TinkerModelRef:
+    """
+    No-op fine-tuning for Fireworks fallback.
+    We intentionally keep the model frozen to obtain
+    a stable self-improvement signal under fixed policy.
+    """
+    ensure_dir(output_model_dir)
+
+    # IMPORTANT: do NOT change the model
+    model_ref = TinkerModelRef(
+        base_model=base_model,
+        sampling_model_path=base_model,  # reuse base model for next iter
+    )
+
+    save_model_ref(output_model_dir, model_ref)
+    return model_ref
+
+
+
+_FIREWORKS_CHAT_URL = "https://api.fireworks.ai/inference/v1/chat/completions"
+
+
+import time
+
+# --- add near imports ---
+from openai import OpenAI
+import os
+import time
+from typing import List, Optional
+
+_FW_CLIENT = None
+
+def _get_fw_client() -> OpenAI:
+    global _FW_CLIENT
+    if _FW_CLIENT is None:
+        _FW_CLIENT = OpenAI(
+            base_url="https://api.fireworks.ai/inference/v1",
+            api_key=os.environ["FIREWORKS_API_KEY"],
+        )
+    return _FW_CLIENT
+
+
+def _fw_chat(
+    model: str,
+    prompt: str,
+    max_tokens: int,
+    temperature: float,
+    stop: Optional[List[str]] = None,
+) -> str:
+    client = _get_fw_client()
+
+    # Fireworks is OpenAI-SDK compatible; this is the most stable path.
+    # Note: Fireworks examples often use max_completion_tokens; max_tokens may also work,
+    # but we’ll use max_completion_tokens to match their docs.
+    last_err = None
+    for attempt in range(3):
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=temperature,
+                max_completion_tokens=max_tokens,
+                stop=stop,
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as e:
+            last_err = e
+            time.sleep(2)
+
+    raise RuntimeError(f"Fireworks request failed after retries: {last_err}")
+
+
+def sample_text(
+    *,
+    model_ref: TinkerModelRef,
+    prompt: str,
+    max_tokens: int,
+    temperature: float,
+    stop: Optional[List[str]] = None,
+    num_samples: int = 1,
+) -> List[str]:
+    model_id = model_ref.sampling_model_path or model_ref.base_model
+    return [
+        _fw_chat(model_id, prompt, max_tokens, temperature, stop)
+        for _ in range(num_samples)
+    ]
+
+
+
+
+'''
+#train.py for tinker api
+
 from __future__ import annotations
 
 import json
@@ -160,52 +317,7 @@ def finetune_sft_lora(
     return model_ref
 
 
-# def sample_text(
-#     *,
-#     model_ref: TinkerModelRef,
-#     prompt: str,
-#     max_tokens: int,
-#     temperature: float,
-#     stop: Optional[List[str]] = None,
-#     num_samples: int = 1,
-# ) -> List[str]:
-#     """
-#     Sample using a Tinker sampling client.
-#     """
-#     import tinker  # type: ignore
-#     from tinker import types  # type: ignore
 
-#     service_client = get_service_client()
-
-#     service_client = get_service_client()
-
-
-#     if model_ref.sampling_model_path is None:
-#         # iter-0：base model → use training client to sample
-#         training_client = get_training_client(
-#             base_model=model_ref.base_model,
-#             rank=32,
-#         )
-#         tokenizer = training_client.get_tokenizer()
-#         sampling_client = training_client.save_weights_and_get_sampling_client(
-#             name="iter0_base_sampler"
-#         )
-#     else:
-#         sampling_client = service_client.create_sampling_client(
-#             model_path=model_ref.sampling_model_path
-#         )
-#         tokenizer = get_tokenizer(model_ref.base_model)
-
-
-#     mi = types.ModelInput.from_ints(tokenizer.encode(prompt))
-#     params = types.SamplingParams(
-#         max_tokens=max_tokens,
-#         temperature=temperature,
-#         stop=stop or [],
-#     )
-#     fut = sampling_client.sample(prompt=mi, sampling_params=params, num_samples=num_samples)
-#     res = fut.result()
-#     return [tokenizer.decode(seq.tokens) for seq in res.sequences]
 def sample_text(
     *,
     model_ref: TinkerModelRef,
@@ -258,3 +370,4 @@ def get_tokenizer(base_model: str):
         )
         _TOKENIZER_CACHE[base_model] = training_client.get_tokenizer()
     return _TOKENIZER_CACHE[base_model]
+'''
