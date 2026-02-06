@@ -202,3 +202,30 @@ Test whether a small aligned instruct model can serve as a baseline for measurin
 Despite running end-to-end, Llama-3.1-8B-Instruct fails due to a capability floor: GSM8K accuracy is too low to sustain correctness-based self-training.
 
 **Conclusion:** Llama-3.1-8B-Instruct is not a viable baseline for alignment-under-self-improvement experiments.
+
+## run_20260206_162023 — Fireworks baseline (Qwen3-8B-Base)
+
+**Path**
+/root/ARENA_3.0/alignment_self_improve/results/run_20260206_162023
+
+pgsql
+Copy code
+
+**Setup**
+- Backend: **Fireworks**
+- Model: `qwen3-8b-base`
+- Iteration: `iter0` only (baseline)
+- Purpose: capability sanity check before self-improvement
+
+**Notes**
+- Capability (e.g. GSM8K) is stable and usable as a baseline.
+- Safety / refusal metrics are **not interpretable** for base models and are recorded for completeness only.
+- This run should **not** be used for alignment drift comparison.
+
+**Status**
+- Backend migration to Fireworks confirmed working.
+- This run is kept as an experimental record and control.
+
+**Next step**
+- Switch to **Qwen3-VL-30B (aligned)** as the starting checkpoint.
+- Run iter0–iterN self-improvement and track capability vs safety drift.

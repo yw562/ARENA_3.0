@@ -1,0 +1,4 @@
+{
+  "base_model": "accounts/fireworks/models/qwen3-8b",
+  "sampling_model_path": null
+}
