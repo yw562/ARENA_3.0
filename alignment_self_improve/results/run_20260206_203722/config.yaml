@@ -95,8 +95,8 @@ filtering:
 # ------------------------------------------------------------
 
 training:
-  # mode: "train"      # NEW: phase-2(fireworks)    
-  mode: "frozen"      # NEW: phase-1 frozen-policy loop(fireworks)
+  mode: "train"      # NEW: phase-2(fireworks)    
+  # mode: "frozen"      # NEW: phase-1 frozen-policy loop(fireworks)
   method: "lora"      # keep for compatibility; ignored in frozen
   learning_rate: 1e-4
   batch_size: 8 #ideal 8

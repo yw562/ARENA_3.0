@@ -56,8 +56,8 @@ def _get_fw_client() -> OpenAI:
     global _FW_CLIENT
     if _FW_CLIENT is None:
         _FW_CLIENT = OpenAI(
-            # ⚠️ 关键点：不要写 /v1
-            base_url="https://api.fireworks.ai/inference",
+            # key?
+            base_url="https://api.fireworks.ai/inference/v1",
             api_key=os.environ["FIREWORKS_API_KEY"],
         )
     return _FW_CLIENT
@@ -190,6 +190,8 @@ def finetune_sft_lora(
     )
     save_model_ref(output_model_dir, ref)
     return ref
+
+
 
 # #train.py for fireworks
 
@@ -430,20 +432,6 @@ def finetune_sft_lora(
 
 #     raise RuntimeError(f"Fireworks request failed after retries: {last_err}")
 
-def sample_text(
-    *,
-    model_ref: TinkerModelRef,
-    prompt: str,
-    max_tokens: int,
-    temperature: float,
-    stop: Optional[List[str]] = None,
-    num_samples: int = 1,
-) -> List[str]:
-    model_id = model_ref.sampling_model_path or model_ref.base_model
-    return [
-        _fw_chat(model_id, prompt, max_tokens, temperature, stop)
-        for _ in range(num_samples)
-    ]
 
 
 '''
