@@ -13,8 +13,8 @@ experiment:
 # ------------------------------------------------------------
 
 model:
-  base_checkpoint: "accounts/fireworks/models/qwen3-4b-instruct-2507"
-  tokenizer: "accounts/fireworks/models/qwen3-4b-instruct-2507"
+  base_checkpoint: "fireworks/qwen3-4b-instruct-2507"
+  tokenizer: "fireworks/qwen3-4b-instruct-2507"
   # base_checkpoint: "meta-llama/Llama-3.2-3B"
   # tokenizer: "meta-llama/Llama-3.2-3B"
   # base_checkpoint: "deepseek-ai/DeepSeek-V3.1-Base"
@@ -35,7 +35,7 @@ model:
 # ------------------------------------------------------------
 
 loop:
-  num_iterations: 0 # tinker: 0 means only baseline
+  num_iterations: 1 # 0 means only baseline
 
 # ------------------------------------------------------------
 # Generation (Step 1)

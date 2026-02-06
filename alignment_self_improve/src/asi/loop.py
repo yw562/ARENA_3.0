@@ -25,70 +25,6 @@ class IterationResult:
     num_generated: int
     num_kept: int
 
-
-# def run_self_improvement_iteration(
-#     *,
-#     iteration: int,
-#     model_dir: Path,
-#     config: Dict,
-#     work_dir: Path,
-# ) -> IterationResult:
-#     """
-#     generate → filter → train → return artifacts
-#     """
-#     iter_dir = work_dir / f"iter_{iteration}"
-#     iter_dir.mkdir(parents=True, exist_ok=True)
-
-#     generated_path = iter_dir / "generated.jsonl"
-#     filtered_path = iter_dir / "filtered.jsonl"
-#     new_model_dir = iter_dir / "model"
-
-#     # num_generated = generate_candidates(
-#     #     model_dir=model_dir,
-#     #     config=config,
-#     #     output_path=generated_path,
-#     # )
-
-#     num_kept = filter_candidates(
-#         generated_path=generated_path,
-#         config=config,
-#         output_path=filtered_path,
-#     )
-
-
-#     # IMPORTANT: skip training if no data survives filtering
-#     if num_kept == 0:
-#         print(f"[iter {iteration}] No training data kept; skipping finetune.")
-#         return IterationResult(
-#             iteration=iteration,
-#             model_dir=model_dir,  # reuse previous model
-#             generated_data_path=generated_path,
-#             filtered_data_path=filtered_path,
-#             num_generated=num_generated,
-#             num_kept=0,
-#         )
-
-
-#     # =====================================================
-#     # Normal training path
-#     # =====================================================
-#     train_on_filtered_data(
-#         base_model_dir=model_dir,
-#         training_data_path=filtered_path,
-#         config=config,
-#         output_model_dir=new_model_dir,
-#         iteration=iteration,
-#     )
-
-#     return IterationResult(
-#         iteration=iteration,
-#         model_dir=new_model_dir,
-#         generated_data_path=generated_path,
-#         filtered_data_path=filtered_path,
-#         num_generated=num_generated,
-#         num_kept=num_kept,
-#     )
-
 def run_self_improvement_iteration(
     *,
     iteration: int,
@@ -259,8 +195,6 @@ def filter_candidates(
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
     return len(kept)
-
-
 def train_on_filtered_data(
     *,
     base_model_dir: Path,
@@ -270,27 +204,44 @@ def train_on_filtered_data(
     iteration: int,
 ) -> None:
     """
-    Minimal LoRA SFT via Tinker. Saves a new local model_ref (remote path) into output_model_dir.
+    Phase-1 (frozen-policy): do NOT update weights.
+    We still materialize iter_{k}/model/tinker_model_ref.json for bookkeeping,
+    so the loop structure (generate→filter→"train") stays intact.
     """
+    mode = config.get("training", {}).get("mode", "train")
     base_ref = load_model_ref(base_model_dir)
-    base_model = base_ref.base_model
 
-    # Load prompt/completion pairs
+    # Always load pairs (we keep artifacts for audit), but frozen ignores them
     pairs: List[Tuple[str, str]] = []
     with training_data_path.open("r", encoding="utf-8") as f:
         for line in f:
             r = json.loads(line)
             pairs.append((r["prompt"], r["completion"]))
 
+    if mode == "frozen":
+        # Key: call finetune_sft_lora but pass zero steps + batch_size=1 so it's a no-op
+        # (works even if later you swap train.py implementation again).
+        finetune_sft_lora(
+            base_model=base_ref.base_model,
+            train_pairs=[],            # kept for record; ignored in frozen train.py # frozen mode: explicitly ignore data
+            output_model_dir=output_model_dir,
+            learning_rate=0.0,
+            max_steps=0,
+            batch_size=1,
+            lora_rank=1,
+            save_name=f"asi_iter_{iteration}_frozen",
+        )
+        return
+
+    # Phase-2 (real training) — keep your original path
     lr = float(config["training"]["learning_rate"])
     bs = int(config["training"]["batch_size"])
     steps = int(config["training"]["max_steps"])
     rank = int(config["training"].get("lora_rank", 32))
-
     save_name = f"asi_iter_{iteration}"
 
     finetune_sft_lora(
-        base_model=base_model,
+        base_model=base_ref.base_model,
         train_pairs=pairs,
         output_model_dir=output_model_dir,
         learning_rate=lr,

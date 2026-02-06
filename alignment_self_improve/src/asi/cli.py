@@ -28,30 +28,15 @@ def load_config(path: Path) -> Dict:
     return yaml.safe_load(path.read_text())
 
 
-def list_tinker_models() -> None:
-    import tinker  # type: ignore
-    service_client = tinker.ServiceClient()
-    caps = service_client.get_server_capabilities()
-    print("Available Tinker models:")
-    for item in caps.supported_models:
-        print("-", item.model_name)
+# def list_tinker_models() -> None:
+#     import tinker  # type: ignore
+#     service_client = tinker.ServiceClient()
+#     caps = service_client.get_server_capabilities()
+#     print("Available Tinker models:")
+#     for item in caps.supported_models:
+#         print("-", item.model_name)
 
 
-# def sample_for_eval(model_dir: Path, prompts: List[str], max_tokens: int, temperature: float) -> List[str]:
-#     model_ref = load_model_ref(model_dir)
-#     outs: List[str] = []
-#     for p in prompts:
-#         res = sample_text(
-#             model_ref=model_ref,
-#             prompt=p,
-#             max_tokens=max_tokens,
-#             temperature=temperature,
-#             # stop=["\n\n"],
-#             stop=None,
-#             num_samples=1,
-#         )
-#         outs.append(res[0] if res else "")
-#     return outs
 def sample_for_eval(
     model_dir: Path,
     prompts: List[str],
@@ -86,12 +71,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--output_dir", type=str, default="")
-    parser.add_argument("--list_models", action="store_true")
+    # parser.add_argument("--list_models", action="store_true")
     args = parser.parse_args()
 
-    if args.list_models:
-        list_tinker_models()
-        return
+    # if args.list_models:
+    #     list_tinker_models()
+    #     return
 
     config_path = Path(args.config)
     cfg = load_config(config_path)
@@ -134,20 +119,6 @@ def main() -> None:
         dst = model0_dir / "tinker_model_ref.json"
         if not dst.exists():
             shutil.copyfile(src, dst)
-
-    # if not (model0_dir / "tinker_model_ref.json").exists():
-    #     if eval_only:
-    #         raise RuntimeError(
-    #             "eval_only mode requires an existing model ref. "
-    #             "Set model.sampling_model_path to a directory containing tinker_model_ref.json, "
-    #             "or set loop.num_iterations > 0 to allow create_initial_model_ref."
-    #         )
-    #     base_model = cfg["model"]["base_checkpoint"]
-    #     create_initial_model_ref(model0_dir, base_model=base_model)
-
-    # if not (model0_dir / "tinker_model_ref.json").exists() and not eval_only:
-    #     base_model = cfg["model"]["base_checkpoint"]
-    #     create_initial_model_ref(model0_dir, base_model=base_model)
 
     if not (model0_dir / "tinker_model_ref.json").exists():
         base_model = cfg["model"]["base_checkpoint"]

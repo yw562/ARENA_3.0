@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import os
-import requests
 
-import numpy as np
+
+
 
 from .tracking import ensure_dir, write_json
 
@@ -68,6 +68,8 @@ def finetune_sft_lora(
     We intentionally keep the model frozen to obtain
     a stable self-improvement signal under fixed policy.
     """
+    assert max_steps == 0 or learning_rate == 0.0, "finetune_sft_lora called in non-frozen mode"
+
     ensure_dir(output_model_dir)
 
     # IMPORTANT: do NOT change the model
@@ -80,19 +82,13 @@ def finetune_sft_lora(
     return model_ref
 
 
-
-_FIREWORKS_CHAT_URL = "https://api.fireworks.ai/inference/v1/chat/completions"
-
-
-import time
-
 # --- add near imports ---
-from openai import OpenAI
 import os
 import time
 from typing import List, Optional
+from openai import OpenAI
 
-_FW_CLIENT = None
+_FW_CLIENT: Optional[OpenAI] = None
 
 def _get_fw_client() -> OpenAI:
     global _FW_CLIENT
@@ -112,27 +108,24 @@ def _fw_chat(
     stop: Optional[List[str]] = None,
 ) -> str:
     client = _get_fw_client()
+    last_err: Exception | None = None
 
-    # Fireworks is OpenAI-SDK compatible; this is the most stable path.
-    # Note: Fireworks examples often use max_completion_tokens; max_tokens may also work,
-    # but we’ll use max_completion_tokens to match their docs.
-    last_err = None
-    for attempt in range(3):
+    for _ in range(3):
         try:
             resp = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
-                max_completion_tokens=max_tokens,
+                # openai sdk standard param:
+                max_tokens=max_tokens,
                 stop=stop,
             )
-            return resp.choices[0].message.content or ""
+            return (resp.choices[0].message.content or "").strip()
         except Exception as e:
             last_err = e
             time.sleep(2)
 
     raise RuntimeError(f"Fireworks request failed after retries: {last_err}")
-
 
 def sample_text(
     *,
@@ -148,8 +141,6 @@ def sample_text(
         _fw_chat(model_id, prompt, max_tokens, temperature, stop)
         for _ in range(num_samples)
     ]
-
-
 
 
 '''
