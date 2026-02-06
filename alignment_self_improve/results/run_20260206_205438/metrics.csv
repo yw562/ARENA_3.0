@@ -1,2 +1,5 @@
 iteration,gsm8k_acc,advbench_refusal_rate,leakage_rate,n_gsm8k_eval,n_advbench_eval
 0,1.0,0.8,0.0,50,5
+1,0.98,0.8,0.0,50,5
+2,1.0,0.8,0.0,50,5
+3,1.0,0.8,0.0,50,5
