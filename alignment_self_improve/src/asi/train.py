@@ -25,6 +25,7 @@ MODEL_REF_FILENAME = "tinker_model_ref.json"
 class TinkerModelRef:
     base_model: str
     sampling_model_path: Optional[str] = None
+    lora_job_id: Optional[str] = None
 
 
 def save_model_ref(model_dir: Path, ref: TinkerModelRef) -> None:
@@ -152,43 +153,89 @@ def finetune_sft_lora(
                 ]
             }) + "\n")
 
-    client = _get_fw_client()
+def finetune_sft_lora(
+    *,
+    base_model: str,
+    train_pairs: List[Tuple[str, str]],
+    output_model_dir: Path,
+    learning_rate: float,
+    max_steps: int,
+    batch_size: int,
+    lora_rank: int = 32,
+    save_name: str = "asi_model",
+    mode: str = "train",
+) -> TinkerModelRef:
+    # """
+    # Fireworks-compatible LoRA hook.
 
-    # upload dataset
-    with open(train_file, "rb") as f:
-        upload = client.files.create(
-            file=f,
-            purpose="fine-tune",
+    # This function DOES NOT run LoRA training.
+    # It only:
+    #   1) writes train.jsonl
+    #   2) creates a placeholder model_ref
+
+    # Actual LoRA training is done via Fireworks UI / firectl.
+    # """
+    """
+    This function prepares LoRA training artifacts.
+    Actual LoRA training is triggered by scripts/submit_fireworks_sft.py.
+    """
+    ensure_dir(output_model_dir)
+
+    # -------------------------------
+    # Phase 1: frozen policy
+    # -------------------------------
+    if mode == "frozen":
+        ref = TinkerModelRef(
+            base_model=base_model,
+            sampling_model_path=base_model,
         )
+        save_model_ref(output_model_dir, ref)
+        return ref
 
-    # launch job
-    job = client.fine_tuning.jobs.create(
-        model=base_model,
-        training_file=upload.id,
-        hyperparameters={
-            "learning_rate": learning_rate,
-            "batch_size": batch_size,
-            "max_steps": max_steps,
+    # -------------------------------
+    # Phase 2: write training data ONLY
+    # -------------------------------
+    train_dir = output_model_dir.parent / "train"
+    ensure_dir(train_dir)
+
+    train_file = train_dir / "train.jsonl"
+    with train_file.open("w", encoding="utf-8") as f:
+        for p, c in train_pairs:
+            f.write(json.dumps({
+                "messages": [
+                    {"role": "user", "content": p},
+                    {"role": "assistant", "content": c},
+                ]
+            }) + "\n")
+
+    # write a TODO file so you don't forget what to do next
+    write_json(
+        train_dir / "FIREWORKS_TODO.json",
+        {
+            "base_model": base_model,
+            "dataset_path": str(train_file),
             "lora_rank": lora_rank,
+            "learning_rate": learning_rate,
+            "max_steps": max_steps,
+            "batch_size": batch_size,
+            "instruction": (
+                "Upload train.jsonl to Fireworks → run SFT (LoRA) → "
+                "copy the resulting model_id into "
+                f"{output_model_dir / MODEL_REF_FILENAME}"
+            ),
         },
-        suffix=save_name,
     )
 
-    while True:
-        job = client.fine_tuning.jobs.retrieve(job.id)
-        if job.status == "succeeded":
-            break
-        if job.status == "failed":
-            raise RuntimeError(f"Fireworks finetune failed: {job}")
-        time.sleep(30)
-
-    assert job.fine_tuned_model is not None
-
+    # placeholder model ref (NO UPDATE YET)
     ref = TinkerModelRef(
         base_model=base_model,
-        sampling_model_path=job.fine_tuned_model,
+        sampling_model_path=base_model,  # will be overwritten manually
     )
     save_model_ref(output_model_dir, ref)
+
+    print(f"[LoRA] Training data written to {train_file}")
+    print("[LoRA] Run Fireworks SFT manually, then update sampling_model_path")
+
     return ref
 
 

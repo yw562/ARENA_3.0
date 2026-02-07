@@ -66,7 +66,11 @@ def run_self_improvement_iteration(
 
     # --- previous logics ---
     if num_kept == 0:
-        print(f"[iter {iteration}] No training data kept; skipping finetune.")
+        ensure_dir(new_model_dir)
+        # explicitly copy previous model_ref
+        prev_ref = load_model_ref(model_dir)
+        write_json(new_model_dir / "tinker_model_ref.json", prev_ref.__dict__)
+        
         return IterationResult(
             iteration=iteration,
             model_dir=model_dir,
@@ -86,6 +90,15 @@ def run_self_improvement_iteration(
             config=config,
             output_model_dir=new_model_dir,
             iteration=iteration,
+        )
+        
+    # --- HARD CHECK: training must materialize a new model ref ---
+    training_mode = config.get("training", {}).get("mode", "train")
+    if training_mode == "train":
+        ref_path = new_model_dir / "tinker_model_ref.json"
+        assert ref_path.exists(), (
+            f"[iter {iteration}] training.mode='train' but no model_ref found at {ref_path}. "
+            "Did you forget to run Fireworks SFT or update sampling_model_path?"
         )
 
     return IterationResult(
