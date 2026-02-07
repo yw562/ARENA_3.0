@@ -107,6 +107,9 @@ def main() -> None:
 
     # Mode switch: eval-only if no iterations (no training)
     num_iter = int(cfg["loop"]["num_iterations"])
+    print("[DEBUG] num_iterations =", num_iter)
+    print("[DEBUG] training.mode =", cfg.get("training", {}).get("mode"))
+
     eval_only = (num_iter == 0)
 
     # Initialize model ref directory for iteration 0
