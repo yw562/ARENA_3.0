@@ -109,49 +109,49 @@ def sample_text(
         for _ in range(num_samples)
     ]
 
-# ============================================================
-# Fine-tuning (Phase-1 frozen / Phase-2 train)
-# ============================================================
+# # ============================================================
+# # Fine-tuning (Phase-1 frozen / Phase-2 train)
+# # ============================================================
 
-def finetune_sft_lora(
-    *,
-    base_model: str,
-    train_pairs: List[Tuple[str, str]],
-    output_model_dir: Path,
-    learning_rate: float,
-    max_steps: int,
-    batch_size: int,
-    lora_rank: int = 32,
-    save_name: str = "asi_model",
-    mode: str = "train",
-) -> TinkerModelRef:
-    ensure_dir(output_model_dir)
+# def finetune_sft_lora(
+#     *,
+#     base_model: str,
+#     train_pairs: List[Tuple[str, str]],
+#     output_model_dir: Path,
+#     learning_rate: float,
+#     max_steps: int,
+#     batch_size: int,
+#     lora_rank: int = 32,
+#     save_name: str = "asi_model",
+#     mode: str = "train",
+# ) -> TinkerModelRef:
+#     ensure_dir(output_model_dir)
 
-    # -------------------------------
-    # Phase 1: frozen policy
-    # -------------------------------
-    if mode == "frozen":
-        ref = TinkerModelRef(
-            base_model=base_model,
-            sampling_model_path=base_model,
-        )
-        save_model_ref(output_model_dir, ref)
-        return ref
+#     # -------------------------------
+#     # Phase 1: frozen policy
+#     # -------------------------------
+#     if mode == "frozen":
+#         ref = TinkerModelRef(
+#             base_model=base_model,
+#             sampling_model_path=base_model,
+#         )
+#         save_model_ref(output_model_dir, ref)
+#         return ref
 
-    # -------------------------------
-    # Phase 2: real Fireworks LoRA
-    # -------------------------------
-    assert max_steps > 0 and learning_rate > 0.0
+#     # -------------------------------
+#     # Phase 2: real Fireworks LoRA
+#     # -------------------------------
+#     assert max_steps > 0 and learning_rate > 0.0
 
-    train_file = output_model_dir / "train.jsonl"
-    with train_file.open("w", encoding="utf-8") as f:
-        for p, c in train_pairs:
-            f.write(json.dumps({
-                "messages": [
-                    {"role": "user", "content": p},
-                    {"role": "assistant", "content": c},
-                ]
-            }) + "\n")
+#     train_file = output_model_dir / "train.jsonl"
+#     with train_file.open("w", encoding="utf-8") as f:
+#         for p, c in train_pairs:
+#             f.write(json.dumps({
+#                 "messages": [
+#                     {"role": "user", "content": p},
+#                     {"role": "assistant", "content": c},
+#                 ]
+#             }) + "\n")
 
 def finetune_sft_lora(
     *,
@@ -187,7 +187,7 @@ def finetune_sft_lora(
     if mode == "frozen":
         ref = TinkerModelRef(
             base_model=base_model,
-            sampling_model_path=base_model,
+            sampling_model_path=base_model, ## TEMP: use base model until LoRA job completes
         )
         save_model_ref(output_model_dir, ref)
         return ref

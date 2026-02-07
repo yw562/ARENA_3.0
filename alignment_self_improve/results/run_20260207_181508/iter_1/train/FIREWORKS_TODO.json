@@ -1,0 +1,9 @@
+{
+  "base_model": "accounts/fireworks/models/kimi-k2-instruct-0905",
+  "dataset_path": "results/run_20260207_181508/iter_1/train/train.jsonl",
+  "lora_rank": 32,
+  "learning_rate": 0.0001,
+  "max_steps": 20,
+  "batch_size": 8,
+  "instruction": "Upload train.jsonl to Fireworks → run SFT (LoRA) → copy the resulting model_id into results/run_20260207_181508/iter_1/model/tinker_model_ref.json"
+}
