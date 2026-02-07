@@ -1,136 +1,82 @@
-📄 alignment_self_improve/README.md
 # Measuring Alignment Under Self-Improvement
 
-This repository implements a **minimal, modular, and reproducible** pipeline
-to study how **capability and alignment metrics evolve under iterative self-improvement**.
+This project studies how **alignment properties (refusal / safety)** evolve under
+iterated self-improvement loops (STaR / SPIN-style), alongside capability gains.
 
-The core research question is:
-
-> When models improve their own capabilities through self-generated data,
-> does alignment (e.g. refusal behavior) degrade?
-
-This project is designed as an ARENA capstone and a potential submission to
-the RSI / Recursive workshop (ICLR).
+The core question:
+> As models bootstrap their own reasoning ability, does alignment hold up?
 
 ---
 
-## High-level Design
+## Overview
 
-Each experiment consists of **iterations**.
-Iteration 0 is always a **baseline evaluation** (no training).
+We implement a minimal, controlled self-improvement pipeline:
 
-For iteration `k > 0`, the pipeline runs:
+1. **Generate** model outputs on a reasoning task (GSM8K)
+2. **Filter** for correctness (exact match)
+3. **Self-train** on model-generated reasoning traces
+4. **Evaluate** both:
+   - Capability (GSM8K accuracy)
+   - Safety (AdvBench refusal & leakage rates)
+5. Repeat for multiple iterations
 
-1. **Generate** self-produced solutions on GSM8K
-2. **Filter** correct solutions (exact-match final answer)
-3. **Train** via LoRA (using Tinker API)
-4. **Evaluate**
-   - Capability: GSM8K exact match
-   - Alignment: refusal rate on AdvBench-style prompts
+Crucially, capability and safety are tracked **at every iteration**.
 
-All artifacts are written to disk to ensure auditability.
+---
+
+## Design Principles
+
+- **Separation of concerns**
+  - Research loop & evaluation run locally
+  - Parameter updates (LoRA / SFT) are executed platform-side (Fireworks)
+- **Auditability**
+  - All eval outputs and safety labels are saved per iteration
+- **Controlled comparisons**
+  - Supports frozen-policy vs LoRA-updated variants
+
+---
+
+## Metrics
+
+### Capability
+- GSM8K exact match accuracy
+
+### Safety
+- AdvBench hard refusal rate
+- Leakage rate (non-refusal harmful continuations)
 
 ---
 
 ## Repository Structure
 
-
-
+```text
 alignment_self_improve/
 ├── configs/
-│ └── instruct.yaml # experiment configuration
-├── src/asi/
-│ ├── cli.py # main entrypoint
-│ ├── loop.py # generate → filter → train
-│ ├── data.py # dataset loaders & parsers
-│ ├── train.py # Tinker wrappers (sampling + LoRA)
-│ ├── eval_capability.py # GSM8K exact-match metric
-│ ├── eval_safety.py # refusal-rate metric
-│ └── tracking.py # metrics & artifact logging
+│   └── instruct.yaml          # experiment configuration
+├── src/
+│   └── asi/
+│       ├── cli.py             # main entrypoint
+│       ├── loop.py            # generate → filter → train loop
+│       ├── data.py            # dataset loaders & parsers
+│       ├── train.py           # Tinker / Fireworks wrappers (sampling + LoRA)
+│       ├── eval_capability.py # GSM8K exact-match metric
+│       ├── eval_safety.py     # refusal & leakage metrics
+│       └── tracking.py        # metrics & artifact logging
 ├── scripts/
-│ └── run_experiment.py # thin wrapper around cli
+│   └── run_experiment.py      # thin wrapper around cli
 ├── results/
-│ └── run_YYYYMMDD_HHMMSS/ # auto-generated outputs
+│   └── run_YYYYMMDD_HHMMSS/   # auto-generated experiment outputs
 └── README.md
 
 
 ---
 
-## Reproducibility Guarantees
-
-The pipeline is designed so that:
-
-- **Evaluation metrics are independent of model execution**
-- Metrics can be validated using fake outputs (see below)
-- All configs are snapshotted into the results directory
-- Raw model outputs are saved for auditability
-
----
-
-## Setup
+## Running the Pipeline
 
 ```bash
-cd alignment_self_improve
-pip install -r requirements.txt   # or use arena-env
-export TINKER_API_KEY=YOUR_KEY
-
-Running an Experiment
-Iteration 0 (baseline evaluation only)
-PYTHONPATH=src python scripts/run_experiment.py \
-  --config configs/instruct.yaml
+python scripts/run_experiment.py --config configs/instruct.yaml
 
 
-This will:
-
-Evaluate the base (instruct) model
-
-Write metrics and raw outputs
-
-Not run self-improvement if num_iterations: 0
-
-Validating the Evaluation Pipeline (No Model Required)
-GSM8K Capability Metric
-PYTHONPATH=src python
-
-from asi.eval_capability import eval_gsm8k_exact_match
-from asi.data import load_gsm8k, parse_gsm8k_final_answer
-
-gsm = load_gsm8k("test", limit=3)
-correct = parse_gsm8k_final_answer(gsm[0].answer)
-
-fake_outputs = [
-    f"#### {correct}",  # correct
-    "#### 999",         # incorrect
-    "I don't know"      # incorrect
-]
-
-res = eval_gsm8k_exact_match(gsm, fake_outputs)
-print(res)
-
-
-Expected: accuracy ≈ 0.33
-
-Refusal Metric
-from asi.eval_safety import eval_refusal_rate
-
-fake = [
-  "I cannot help with that request.",
-  "I'm sorry, but I can't assist with this.",
-  "Sure, here is how you do it..."
-]
-
-print(eval_refusal_rate(fake))
-
-
-Expected: refusal_rate ≈ 0.66
-
-Notes
-
-Backend capacity (Tinker) may temporarily pause model creation.
-
-All evaluation logic can be tested independently of model availability.
-
-Iteration >0 enables self-improvement via LoRA.
 
 Contact
 
