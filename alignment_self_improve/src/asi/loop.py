@@ -115,7 +115,8 @@ def generate_candidates(
     ensure_dir(output_path.parent)
 
     # Load training examples for self-generation (small subset)
-    n = int(config["generation"]["num_samples"])
+    # n = int(config["generation"]["num_samples"]) 
+    n = int(config["generation"]["train_limit"]) 
     train_split = config.get("generation", {}).get("train_split", "train")
     gsm_train = load_gsm8k(train_split, limit=n)
 

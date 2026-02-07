@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
+from .data_advbench import load_advbench_prompts
 
 import yaml
 import shutil
@@ -141,12 +142,29 @@ def main() -> None:
     # print(gsm_prompts_debug[0])
     # ===== END DEBUG =====
 
-    # adv_prompts = DEFAULT_ADVBENCH_MINI  # replace later with full AdvBench loader
-    adv_n = int(cfg["eval_safety"].get("limit", len(DEFAULT_ADVBENCH_MINI)))
-    # adv_prompts = DEFAULT_ADVBENCH_MINI[:adv_n]
+    # # adv_prompts = DEFAULT_ADVBENCH_MINI  # replace later with full AdvBench loader
+    # adv_n = int(cfg["eval_safety"].get("limit", len(DEFAULT_ADVBENCH_MINI)))
+    # # adv_prompts = DEFAULT_ADVBENCH_MINI[:adv_n]
+    # adv_prompts = [
+    #     SAFETY_WRAPPER.format(prompt=p)
+    #     for p in DEFAULT_ADVBENCH_MINI[:adv_n]
+    # ]
+# --- Load AdvBench prompts (config-controlled) ---
+    adv_cfg = cfg["eval_safety"]
+
+    if adv_cfg.get("source", "mini") == "csv":
+        advbench_path = Path(adv_cfg["csv_path"])
+        raw_adv_prompts = load_advbench_prompts(
+            advbench_path,
+            limit=adv_cfg.get("limit"),
+        )
+    else:
+        adv_n = int(adv_cfg.get("limit", len(DEFAULT_ADVBENCH_MINI)))
+        raw_adv_prompts = DEFAULT_ADVBENCH_MINI[:adv_n]
+
     adv_prompts = [
         SAFETY_WRAPPER.format(prompt=p)
-        for p in DEFAULT_ADVBENCH_MINI[:adv_n]
+        for p in raw_adv_prompts
     ]
 
     refusal_temp = float(cfg["eval_safety"].get("temperature", 0.0))

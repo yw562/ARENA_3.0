@@ -1,0 +1,4 @@
+{
+  "base_model": "accounts/fireworks/models/kimi-k2-instruct-0905",
+  "sampling_model_path": null
+}
